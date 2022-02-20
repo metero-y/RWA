@@ -10,7 +10,9 @@ import networkx as nx
 from gurobipy import *
 
 #还需要添加bound and price
+'''
 
+'''
 
 # 判断任务请求在图G中是否存在路径, 若存在返回对应路径
 def has_path(G, task):
