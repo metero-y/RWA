@@ -5,14 +5,11 @@
 """
 import collections
 import copy
+import random
 
 import networkx as nx
 from gurobipy import *
-
-# 还需要添加bound and price
-'''
-
-'''
+import numpy as np
 
 
 # 判断任务请求在图G中是否存在路径, 若存在返回对应路径
@@ -465,18 +462,28 @@ def MP(SD, W, C, a):
 
 
 if __name__ == "__main__":
-    L = [(0, 1), (1, 3), (0, 2), (2, 3)]  # 边
+    L = [(0, 1), (0, 2), (0, 3),(1,2),(1,7),(2,5),(3,4),(3,8),(4,5),(4,6),(5,10),(5,12),(6,7),(7,9),(8,11),(8,13),(9,10),(9,11),(9,13),(11,12),(12,13)]  # 边
     arcs = []  # 双向边
     for i in range(len(L)):
         arcs.append(L[i])
         arcs.append((L[i][1], L[i][0]))
-    V = range(4)  # 结点
-    SD = {(0, 3): 3, (0, 2): 1}  # 任务
+    V = range(14)  # 结点
+    
+    random.seed(1015)  # 设置随机种子random.seed(2)  
+    K = []
+    for _ in range(436):
+        task = random.sample(range(14), 2)#结点不可重复
+        K.append((task[0], task[1]))
+    SD = collections.Counter(K)  # 任务
     SD_idx = []
     for rq in SD:
         SD_idx.append(rq)
+    print('平均值',np.mean(list(SD.values())))
+    print('方差',np.var(list(SD.values())))
+    
+ 
 
-    W = range(2)  # 可使用波长
+    W = range(30)  # 可使用波长
     G = nx.Graph()
     for i in V:
         G.add_node(V[i])
