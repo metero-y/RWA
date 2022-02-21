@@ -37,6 +37,7 @@ def RF(arcs, V, SD, SD_idx,
        W):  # routing formulation that ignores the wavelength continuity constraints and omits integrality requirements
     try:
         m = gurobipy.Model('RF')
+        m.setParam('OutputFlag', 0)
         fsdl = m.addVars(arcs, range(len(SD)), lb=0.0, ub=GRB.INFINITY, vtype=GRB.CONTINUOUS, name='fsdl')
         dsd = []
         for i in SD_idx:
@@ -92,7 +93,7 @@ def RF(arcs, V, SD, SD_idx,
         return 0
 
 
-def has_K_path(G, task, strategy, SD, SD_idx, arcs, V, W):
+def has_K_path(G, task, strategy, SD, SD_idx, arcs, V, W, load_acr):
     """
     :param          G: 图
     :param       task: 任务请求
@@ -142,7 +143,6 @@ def has_K_path(G, task, strategy, SD, SD_idx, arcs, V, W):
                     all_path = Path[:p_l + length + 1]  # 最后一组pi全部需要
                 else:
                     pi = Path[p_l + 1:p_l + length + 1]  # 提取最后一组pi
-                    load_acr = RF(arcs, V, SD, SD_idx, W)
                     if not load_acr:
                         return False, None
                     load_l = []
@@ -184,7 +184,6 @@ def has_K_path(G, task, strategy, SD, SD_idx, arcs, V, W):
                     all_path = Path[:p_l + length + 1]  # 最后一组pi全部需要
                 else:
                     pi = Path[p_l + 1:p_l + length + 1]  # 提取最后一组pi
-                    load_acr = RF(arcs, V, SD, SD_idx, W)
                     if not load_acr:
                         return False, None
                     load_l = []
@@ -233,8 +232,12 @@ def ALL_K_Shortest_Path(SD, SD_idx, G, strategy, arcs, V, W):
     :return:     Path: 每个任务连接请求的对应的所有k最短路径， 找不到路径的序对的路径为空
     """
     Path = []  # 存储每个连接请求的最短路径
+    if strategy == 2 or strategy == 3:
+        load_acr = RF(arcs, V, SD, SD_idx, W)
+    else:
+        load_acr = {}
     for task in SD_idx:
-        exist_path, path = has_K_path(G, task, strategy, SD, SD_idx, arcs, V, W)
+        exist_path, path = has_K_path(G, task, strategy, SD, SD_idx, arcs, V, W, load_acr)
         if exist_path:
             Path.append(path)
         else:  # 找不到最短路径
@@ -244,32 +247,36 @@ def ALL_K_Shortest_Path(SD, SD_idx, G, strategy, arcs, V, W):
 
 def CG(arcs, V, SD, SD_idx, W, C, a):
     while 1:
-        dual = RMP(SD, SD_idx, W, C, a)
-        solver = LPP(arcs, V, SD, SD_idx, C, a, dual)
-        if not solver:
+        dual_objval = RMP(SD, SD_idx, W, C, a)
+        print(len(C), C[-1])
+        solver = LPP(arcs, V, SD, SD_idx, C, a, dual_objval[0])
+        if not solver or C[-1] == C[-2]:
             break
-    return MP(SD, W, C, a)
+    return MP(SD, W, C, a, dual_objval[1])
 
 
 def CG_plus(arcs, V, SD, SD_idx, W, C, a, P):
     while 1:
-        dual = RMP(SD, SD_idx, W, C, a)
-        solver = PPP(arcs, V, SD, SD_idx, C, a, dual, P)
-        if solver:
+        dual_objval = RMP(SD, SD_idx, W, C, a)
+        solver = PPP(arcs, V, SD, SD_idx, C, a, dual_objval[0], P)
+        print('PPP', len(C), C[-1])
+        if solver and C[-1] != C[-2]:
             continue
-        solver = LPP(arcs, V, SD, SD_idx, C, a, dual)
-        if not solver:
+        solver = LPP(arcs, V, SD, SD_idx, C, a, dual_objval[0])
+        print('LPP', len(C), C[-1])
+        if not solver or C[-1] == C[-2]:
             break
-    return MP(SD, W, C, a)
+    return MP(SD, W, C, a, dual_objval[1])
 
 
 def CG_plus_H(arcs, V, SD, SD_idx, W, C, a, P):
     while 1:
-        dual = RMP(SD, SD_idx, W, C, a)
-        solver = PPP(arcs, V, SD, SD_idx, C, a, dual, P)
-        if solver:
+        dual_objval = RMP(SD, SD_idx, W, C, a)
+        solver = PPP(arcs, V, SD, SD_idx, C, a, dual_objval[0], P)
+        print(len(C), C[-1])
+        if not solver or C[-1] == C[-2]:
             break
-    return MP(SD, W, C, a)
+    return MP(SD, W, C, a, dual_objval[1])
 
 
 def RMP(SD, SD_idx, W, C, a):  # restrict master problem
@@ -291,7 +298,7 @@ def RMP(SD, SD_idx, W, C, a):  # restrict master problem
 
         m.optimize()
         m.write('RMP.lp')
-        return (m.pi)
+        return (m.pi, m.objVal)
 
 
     except gurobipy.GurobiError as e:
@@ -427,10 +434,10 @@ def PPP(arcs, V, SD, SD_idx, C, a, dual, P):  # price problem：path
         return 0
 
 
-def MP(SD, W, C, a):
+def MP(SD, W, C, a, opt):
     try:
         m = gurobipy.Model('cg')
-        m.setParam('OutputFlag', 0)
+        # m.setParam('OutputFlag', 0)
         zc = m.addVars(len(C), lb=0.0, ub=GRB.INFINITY, vtype=GRB.INTEGER, name='zc')
         ysd = m.addVars(len(SD), lb=0.0, ub=GRB.INFINITY, vtype=GRB.CONTINUOUS, name='ysd')
 
@@ -450,7 +457,7 @@ def MP(SD, W, C, a):
         for v in m.getVars():
             if v.varName[:2] == 'zc':
                 ans[v.varName] = v.x
-        return (ans)
+        return (opt, m.objVal, ans)
 
     except gurobipy.GurobiError as e:
         print('Errorcode ' + str(e.errno) + ": " + str(e))
@@ -462,26 +469,25 @@ def MP(SD, W, C, a):
 
 
 if __name__ == "__main__":
-    L = [(0, 1), (0, 2), (0, 3),(1,2),(1,7),(2,5),(3,4),(3,8),(4,5),(4,6),(5,10),(5,12),(6,7),(7,9),(8,11),(8,13),(9,10),(9,11),(9,13),(11,12),(12,13)]  # 边
+    L = [(0, 1), (0, 2), (0, 3), (1, 2), (1, 7), (2, 5), (3, 4), (3, 8), (4, 5), (4, 6), (5, 10), (5, 12), (6, 7),
+         (7, 9), (8, 11), (8, 13), (9, 10), (9, 11), (9, 13), (11, 12), (12, 13)]  # 边
     arcs = []  # 双向边
     for i in range(len(L)):
         arcs.append(L[i])
         arcs.append((L[i][1], L[i][0]))
     V = range(14)  # 结点
-    
+
     random.seed(1015)  # 设置随机种子random.seed(2)  
     K = []
     for _ in range(436):
-        task = random.sample(range(14), 2)#结点不可重复
+        task = random.sample(range(14), 2)  # 结点不可重复
         K.append((task[0], task[1]))
     SD = collections.Counter(K)  # 任务
     SD_idx = []
     for rq in SD:
         SD_idx.append(rq)
-    print('平均值',np.mean(list(SD.values())))
-    print('方差',np.var(list(SD.values())))
-    
- 
+    print('平均值', np.mean(list(SD.values())))
+    print('方差', np.var(list(SD.values())))
 
     W = range(30)  # 可使用波长
     G = nx.Graph()
