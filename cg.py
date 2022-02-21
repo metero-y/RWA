@@ -9,10 +9,11 @@ import copy
 import networkx as nx
 from gurobipy import *
 
-#还需要添加bound and price
+# 还需要添加bound and price
 '''
 
 '''
+
 
 # 判断任务请求在图G中是否存在路径, 若存在返回对应路径
 def has_path(G, task):
@@ -106,7 +107,7 @@ def has_K_path(G, task, strategy, SD, SD_idx, arcs, V, W):
         num = []  # 存储所有简单路径对应的路径数值
         paths = []  # 列表化Paths
         for i in Paths:
-            num.append(len(i)-1)
+            num.append(len(i) - 1)
             tmp = []
             for j in range(len(i) - 1):
                 tmp.append((i[j], i[j + 1]))
@@ -430,21 +431,24 @@ def MP(SD, W, C, a):
     try:
         m = gurobipy.Model('cg')
         zc = m.addVars(len(C), lb=0.0, ub=GRB.INFINITY, vtype=GRB.INTEGER, name='zc')
+        ysd = m.addVars(len(SD), lb=0.0, ub=GRB.INFINITY, vtype=GRB.CONTINUOUS, name='ysd')
 
         m.addConstr((zc.sum() <= len(W)), name='不能超过可使用波长数')
-        expression = 0
-        for i in SD:
-            prod = [a[j][i] for j in range(len(C))]
-            expression += zc.prod(prod)
-            m.addConstr((zc.prod(prod) <= SD[i]), name='不能超过' + str(i[0]) + ',' + str(i[1]) + '的任务数')
 
-        m.setObjective(expression, GRB.MAXIMIZE)
+        for i in range(len(SD)):
+            prod = [a[j][SD_idx[i]] for j in range(len(C))]
+
+            m.addConstr(ysd[i] <= (zc.prod(prod)), name='不能超过' + str(SD_idx[i]) + '的总路由数')
+        m.addConstrs((ysd[i] <= SD[SD_idx[i]] for i in range(len(SD))), name='不能超过任务数')
+
+        m.setObjective(ysd.sum(), GRB.MAXIMIZE)
 
         m.optimize()
         m.write('cg.lp')
         ans = {}
         for v in m.getVars():
-            ans[v.varName] = v.x
+            if v.varName[:2] == 'zc':
+                ans[v.varName] = v.x
         return (ans)
 
     except gurobipy.GurobiError as e:
@@ -463,7 +467,7 @@ if __name__ == "__main__":
         arcs.append(L[i])
         arcs.append((L[i][1], L[i][0]))
     V = range(4)  # 结点
-    SD = {(0, 3): 2, (0, 2): 2}  # 任务
+    SD = {(0, 3): 3, (0, 2): 1}  # 任务
     SD_idx = []
     for rq in SD:
         SD_idx.append(rq)
@@ -505,9 +509,9 @@ if __name__ == "__main__":
         print(ans)
 
     # CG++与CG++H
-    strategy = 3 # 1,2,3
+    strategy = 3  # 1,2,3
     P2 = ALL_K_Shortest_Path(SD, SD_idx, G, strategy, arcs, V, W)  # CG+&CG+H
-    print('P2',P2)
+    print('P2', P2)
     if 0 in P2:
         print('有任务没有路径')
     else:
