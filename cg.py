@@ -278,6 +278,7 @@ def CG_plus_H(arcs, V, SD, SD_idx, W, C, a, P):
 def RMP(SD, SD_idx, W, C, a):  # restrict master problem
     try:
         m = gurobipy.Model('RMP')
+        m.setParam('OutputFlag', 0)
         zc = m.addVars(len(C), lb=0.0, ub=GRB.INFINITY, vtype=GRB.CONTINUOUS, name='zc')
         ysd = m.addVars(len(SD), lb=0.0, ub=GRB.INFINITY, vtype=GRB.CONTINUOUS, name='ysd')
 
@@ -308,6 +309,7 @@ def RMP(SD, SD_idx, W, C, a):  # restrict master problem
 def LPP(arcs, V, SD, SD_idx, C, a, dual):  # price problem：link
     try:
         m = gurobipy.Model('LPP')
+        m.setParam('OutputFlag', 0)
         asdl = m.addVars(arcs, range(len(SD)), vtype=GRB.BINARY, name='asdl')
 
         m.addConstrs((asdl.sum(i, j, '*') <= 1 for i, j in arcs), name='每条边最多只能满足一个任务')
@@ -369,6 +371,7 @@ def LPP(arcs, V, SD, SD_idx, C, a, dual):  # price problem：link
 def PPP(arcs, V, SD, SD_idx, C, a, dual, P):  # price problem：path
     try:
         m = gurobipy.Model('PPP')
+        m.setParam('OutputFlag', 0)
         bsdp = []  # beta^sd_p
         for i in range(len(SD)):
             tmp = m.addVars(len(P[i]), vtype=GRB.BINARY, name='bsdp' + str(SD_idx[i]))
@@ -430,6 +433,7 @@ def PPP(arcs, V, SD, SD_idx, C, a, dual, P):  # price problem：path
 def MP(SD, W, C, a):
     try:
         m = gurobipy.Model('cg')
+        m.setParam('OutputFlag', 0)
         zc = m.addVars(len(C), lb=0.0, ub=GRB.INFINITY, vtype=GRB.INTEGER, name='zc')
         ysd = m.addVars(len(SD), lb=0.0, ub=GRB.INFINITY, vtype=GRB.CONTINUOUS, name='ysd')
 
