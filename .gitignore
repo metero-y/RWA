@@ -1,2 +1,7 @@
 # My configurations:
 *.lp
+*.aux
+*.log
+*.pdf
+*.synctex.gz
+*.tex
