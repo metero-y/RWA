@@ -521,11 +521,9 @@ if __name__ == "__main__":
     print('方差', np.var(list(SD.values())))
 
     W = range(30)  # 可使用波长
-    G = nx.Graph()
-    for i in V:
-        G.add_node(V[i])
-    for x, y in arcs:  # edges::
-        G.add_edges_from([(x, y)])
+    G = nx.DiGraph()
+    G.add_nodes_from(V)
+    G.add_edges_from(arcs)
 
     opt(W, K, arcs, V)  # 最优解
 
