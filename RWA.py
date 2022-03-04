@@ -9,6 +9,8 @@ from math import copysign
 import networkx as nx
 import random
 
+from sqlalchemy import true
+
 
 def solve(dna, K, W, edges, nodes, val):
     LightPath = []
@@ -55,10 +57,10 @@ if __name__ == "__main__":
     G=[]
     W = range(30)
     for _ in W:  # 构建分层图
-        g = nx.DiGraph()
-        g.add_nodes_from(V)
-        g.add_edges_from(arcs)
-        print(g)
+        g = nx.DiGraph((x, y, {'weight': len(W)}) for (x, y) in arcs)
         G.append(g)
-    deg=nx.degree(G[0])
+    deg={} #结点的度
+    for x,y in nx.degree(G[0]):
+        deg[x]=y//2
+    print(nx.get_edge_attributes(G[0],'weight'))
     
