@@ -92,6 +92,52 @@ def solve(G, sp_len, al_simple_path, SD, W, residue_rq, bandwidth):
     return C, C_len
 
 
+def opt(W, K, arcs, V, assignment, C_len):
+    try:
+        m = gurobipy.Model('opt')
+        xwke = m.addVars(W, range(len(K)), arcs, vtype=GRB.BINARY, name='xkew')
+        ywk = m.addVars(W, range(len(K)), vtype=GRB.BINARY, name='ywk')
+
+        m.addConstrs((ywk.sum('*', k) <= 1 for k in range(len(K))),
+                     name='每个任务最多只分配一个波长')
+        m.addConstrs((xwke.sum(w, '*', i, j) <= 1 for w in W for i,
+                     j in arcs), name='同一波长链路只能有一个信息')
+        m.addConstrs((xwke[w, k, i, j] <= ywk[w, k] for w in W for k in range(len(K)) for i, j in arcs),
+                     name='不在任务波长下的任务链路为0')
+        m.addConstrs(
+            (xwke.sum(w, k, '*', j) == xwke.sum(w, k, j, '*') for w in W for k in range(len(K)) for j in V if
+             j != K[k][0] and j != K[k][1]), "流守恒")
+        m.addConstrs((xwke.sum(w, k, K[k][0], '*') - xwke.sum(w, k, '*', K[k][0]) == ywk[w, k] for w in W for k in
+                      range(len(K))), "发源地")
+        m.addConstrs((xwke.sum(w, k, K[k][1], '*') - xwke.sum(w, k, '*', K[k][1]) == -ywk[w, k] for w in W for k in
+                      range(len(K))), "接受地")
+
+        m.setObjective(ywk.sum(), GRB.MAXIMIZE)
+
+        for w in W:
+            for k in range(len(K)):
+                ywk[w, k].Start = 0
+                for x, y in arcs:
+                    xwke[w, k, x, y].Start = 0
+
+        for w in W:
+            for k in range(len(assignment[w])):
+                ywk[w, assignment[w][k]].Start = 1
+                for i in range(len(C_len[w][k])-1):
+                    xwke[w, assignment[w][k], C_len[w][k]
+                         [i], C_len[w][k][i+1]].Start = 1
+
+        m.optimize()
+        print(m.objVal)
+    except gurobipy.GurobiError as e:
+        print('Errorcode ' + str(e.errno) + ": " + str(e))
+        return 0
+
+    except AttributeError:
+        print('Encountered an attribute error')
+        return
+
+
 if __name__ == "__main__":
     L = [(0, 1), (0, 2), (0, 3), (1, 2), (1, 7), (2, 5), (3, 4), (3, 8), (4, 5), (4, 6), (5, 10), (5, 12), (6, 7),
          (7, 9), (8, 11), (8, 13), (9, 10), (9, 11), (9, 13), (11, 12), (12, 13)]  # 边
@@ -141,12 +187,13 @@ if __name__ == "__main__":
 
     C, C_len = solve(G, sp_len, al_simple_path, SD, W, residue_rq, bandwidth)
 
-    # assignment = [[] for _ in W]#验证结果可靠性
-    # K_copy=copy.deepcopy(K)
+    # assignment = [[] for _ in W]  # 验证结果可靠性
+    # K_copy = copy.deepcopy(K)
     # for w in range(len(W)):
     #     for rq in C[w]:
     #         assignment[w].append(K_copy.index(rq))
-    #         K_copy[assignment[w][-1]]=0
+    #         K_copy[assignment[w][-1]] = 0
+    # opt(W, K, arcs, V, assignment, C_len)
 
     num = 0
     for i in C:
