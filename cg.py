@@ -38,13 +38,16 @@ def RF(arcs, V, SD, SD_idx,
     try:
         m = gurobipy.Model('RF')
         m.setParam('OutputFlag', 0)
-        fsdl = m.addVars(arcs, range(len(SD)), lb=0.0, ub=GRB.INFINITY, vtype=GRB.CONTINUOUS, name='fsdl')
+        fsdl = m.addVars(arcs, range(len(SD)), lb=0.0,
+                         ub=GRB.INFINITY, vtype=GRB.CONTINUOUS, name='fsdl')
         dsd = []
         for i in SD_idx:
-            tmp = m.addVar(lb=0.0, ub=SD[i], vtype=GRB.CONTINUOUS, name='dsd' + str(i))
+            tmp = m.addVar(
+                lb=0.0, ub=SD[i], vtype=GRB.CONTINUOUS, name='dsd' + str(i))
             dsd.append(tmp)
 
-        m.addConstrs((fsdl.sum(i, j, '*') <= len(W) for i, j in arcs), name='每条边最多只能满足一个任务')
+        m.addConstrs((fsdl.sum(i, j, '*') <= len(W)
+                     for i, j in arcs), name='每条边最多只能满足一个任务')
         m.addConstrs(
             (fsdl.sum(k, '*', j) == fsdl.sum('*', k, j) for j in range(len(SD)) for k in V if
              k != SD_idx[j][0] and k != SD_idx[j][1]), "流守恒")
@@ -101,7 +104,8 @@ def has_K_path(G, task, strategy, SD, SD_idx, arcs, V, W, load_acr):
     :return:     path: 所有k最短路径
     """
     try:
-        Paths = nx.all_simple_paths(G, source=task[0], target=task[1])  # 存储所有简单路径
+        Paths = nx.all_simple_paths(
+            G, source=task[0], target=task[1])  # 存储所有简单路径
         num = []  # 存储所有简单路径对应的路径数值
         paths = []  # 列表化Paths
         for i in Paths:
@@ -110,7 +114,8 @@ def has_K_path(G, task, strategy, SD, SD_idx, arcs, V, W, load_acr):
             for j in range(len(i) - 1):
                 tmp.append((i[j], i[j + 1]))
             paths.append(tmp)
-        order = sorted(range(len(num)), key=lambda k: num[k], reverse=False)  # 所有简单路径按长度升序排列, 存储对应的路径序号
+        # 所有简单路径按长度升序排列, 存储对应的路径序号
+        order = sorted(range(len(num)), key=lambda k: num[k], reverse=False)
         Path = copy.deepcopy(paths)
         nums = copy.deepcopy(num)
         for i in range(len(order)):
@@ -156,7 +161,8 @@ def has_K_path(G, task, strategy, SD, SD_idx, arcs, V, W, load_acr):
                     Path_pi = copy.deepcopy(pi)
                     for i in range(len(order_l)):
                         Path_pi[i] = pi[order_l[i]]
-                    all_path = Path[:p_l + 1] + Path_pi[:2 * SD[task] - p_l - 1]
+                    all_path = Path[:p_l + 1] + \
+                        Path_pi[:2 * SD[task] - p_l - 1]
         elif strategy == 3:  # 策略3
             if nums[0] == 1:  # 有一跳路径就只用一跳路径
                 if nums[-1] == 1:
@@ -197,7 +203,8 @@ def has_K_path(G, task, strategy, SD, SD_idx, arcs, V, W, load_acr):
                     Path_pi = copy.deepcopy(pi)
                     for i in range(len(order_l)):
                         Path_pi[i] = pi[order_l[i]]
-                    all_path = Path[:p_l + 1] + Path_pi[:nums[0] * SD[task] - p_l - 1]
+                    all_path = Path[:p_l + 1] + \
+                        Path_pi[:nums[0] * SD[task] - p_l - 1]
         else:
             print('策略有误！')
             return False, None
@@ -237,7 +244,8 @@ def ALL_K_Shortest_Path(SD, SD_idx, G, strategy, arcs, V, W):
     else:
         load_acr = {}
     for task in SD_idx:
-        exist_path, path = has_K_path(G, task, strategy, SD, SD_idx, arcs, V, W, load_acr)
+        exist_path, path = has_K_path(
+            G, task, strategy, SD, SD_idx, arcs, V, W, load_acr)
         if exist_path:
             Path.append(path)
         else:  # 找不到最短路径
@@ -283,23 +291,26 @@ def RMP(SD, SD_idx, W, C, a):  # restrict master problem
     try:
         m = gurobipy.Model('RMP')
         m.setParam('OutputFlag', 0)
-        zc = m.addVars(len(C), lb=0.0, ub=GRB.INFINITY, vtype=GRB.CONTINUOUS, name='zc')
-        ysd = m.addVars(len(SD), lb=0.0, ub=GRB.INFINITY, vtype=GRB.CONTINUOUS, name='ysd')
+        zc = m.addVars(len(C), lb=0.0, ub=GRB.INFINITY,
+                       vtype=GRB.CONTINUOUS, name='zc')
+        ysd = m.addVars(len(SD), lb=0.0, ub=GRB.INFINITY,
+                        vtype=GRB.CONTINUOUS, name='ysd')
 
         m.addConstr((zc.sum() <= len(W)), name='不能超过可使用波长数')
 
         for i in range(len(SD)):
             prod = [a[j][SD_idx[i]] for j in range(len(C))]
 
-            m.addConstr(ysd[i] <= (zc.prod(prod)), name='不能超过' + str(SD_idx[i]) + '的总路由数')
-        m.addConstrs((ysd[i] <= SD[SD_idx[i]] for i in range(len(SD))), name='不能超过任务数')
+            m.addConstr(ysd[i] <= (zc.prod(prod)),
+                        name='不能超过' + str(SD_idx[i]) + '的总路由数')
+        m.addConstrs((ysd[i] <= SD[SD_idx[i]]
+                     for i in range(len(SD))), name='不能超过任务数')
 
         m.setObjective(ysd.sum(), GRB.MAXIMIZE)
 
         m.optimize()
         m.write('RMP.lp')
         return (m.pi, m.objVal)
-
 
     except gurobipy.GurobiError as e:
         print('Errorcode ' + str(e.errno) + ": " + str(e))
@@ -316,7 +327,8 @@ def LPP(arcs, V, SD, SD_idx, C, a, dual):  # price problem：link
         m.setParam('OutputFlag', 0)
         asdl = m.addVars(arcs, range(len(SD)), vtype=GRB.BINARY, name='asdl')
 
-        m.addConstrs((asdl.sum(i, j, '*') <= 1 for i, j in arcs), name='每条边最多只能满足一个任务')
+        m.addConstrs((asdl.sum(i, j, '*') <= 1 for i,
+                     j in arcs), name='每条边最多只能满足一个任务')
         m.addConstrs(
             (asdl.sum(k, '*', j) == asdl.sum('*', k, j) for j in range(len(SD)) for k in V if
              k != SD_idx[j][0] and k != SD_idx[j][1]), "流守恒")
@@ -378,7 +390,8 @@ def PPP(arcs, V, SD, SD_idx, C, a, dual, P):  # price problem：path
         m.setParam('OutputFlag', 0)
         bsdp = []  # beta^sd_p
         for i in range(len(SD)):
-            tmp = m.addVars(len(P[i]), vtype=GRB.BINARY, name='bsdp' + str(SD_idx[i]))
+            tmp = m.addVars(len(P[i]), vtype=GRB.BINARY,
+                            name='bsdp' + str(SD_idx[i]))
             bsdp.append(tmp)
 
         for i in arcs:
@@ -389,7 +402,8 @@ def PPP(arcs, V, SD, SD_idx, C, a, dual, P):  # price problem：path
             m.addConstr(expression <= 1, name='每条边' + str(i) + '最多只能满足一个任务')
 
         for j in range(len(SD)):
-            m.addConstr(bsdp[j].sum() <= SD[SD_idx[j]], "不能超过任务数" + str(SD_idx[j]))
+            m.addConstr(bsdp[j].sum() <= SD[SD_idx[j]],
+                        "不能超过任务数" + str(SD_idx[j]))
 
         expression = 0
         for i in range(len(SD)):
@@ -438,16 +452,20 @@ def MP(SD, W, C, a, opt):
     try:
         m = gurobipy.Model('cg')
         # m.setParam('OutputFlag', 0)
-        zc = m.addVars(len(C), lb=0.0, ub=GRB.INFINITY, vtype=GRB.INTEGER, name='zc')
-        ysd = m.addVars(len(SD), lb=0.0, ub=GRB.INFINITY, vtype=GRB.CONTINUOUS, name='ysd')
+        zc = m.addVars(len(C), lb=0.0, ub=GRB.INFINITY,
+                       vtype=GRB.INTEGER, name='zc')
+        ysd = m.addVars(len(SD), lb=0.0, ub=GRB.INFINITY,
+                        vtype=GRB.CONTINUOUS, name='ysd')
 
         m.addConstr((zc.sum() <= len(W)), name='不能超过可使用波长数')
 
         for i in range(len(SD)):
             prod = [a[j][SD_idx[i]] for j in range(len(C))]
 
-            m.addConstr(ysd[i] <= (zc.prod(prod)), name='不能超过' + str(SD_idx[i]) + '的总路由数')
-        m.addConstrs((ysd[i] <= SD[SD_idx[i]] for i in range(len(SD))), name='不能超过任务数')
+            m.addConstr(ysd[i] <= (zc.prod(prod)),
+                        name='不能超过' + str(SD_idx[i]) + '的总路由数')
+        m.addConstrs((ysd[i] <= SD[SD_idx[i]]
+                     for i in range(len(SD))), name='不能超过任务数')
 
         m.setObjective(ysd.sum(), GRB.MAXIMIZE)
 
@@ -474,8 +492,10 @@ def opt(W, K, arcs, V):
         xwke = m.addVars(W, range(len(K)), arcs, vtype=GRB.BINARY, name='xkew')
         ywk = m.addVars(W, range(len(K)), vtype=GRB.BINARY, name='ywk')
 
-        m.addConstrs((ywk.sum('*', k) <= 1 for k in range(len(K))), name='每个任务最多只分配一个波长')
-        m.addConstrs((xwke.sum(w, '*', i, j) <= 1 for w in W for i, j in arcs), name='同一波长链路只能有一个信息')
+        m.addConstrs((ywk.sum('*', k) <= 1 for k in range(len(K))),
+                     name='每个任务最多只分配一个波长')
+        m.addConstrs((xwke.sum(w, '*', i, j) <= 1 for w in W for i,
+                     j in arcs), name='同一波长链路只能有一个信息')
         m.addConstrs((xwke[w, k, i, j] <= ywk[w, k] for w in W for k in range(len(K)) for i, j in arcs),
                      name='不在任务波长下的任务链路为0')
         m.addConstrs(
@@ -508,7 +528,7 @@ if __name__ == "__main__":
         arcs.append((L[i][1], L[i][0]))
     V = range(14)  # 结点
 
-    random.seed(1015)  # 设置随机种子random.seed(2)  
+    random.seed(1015)  # 设置随机种子random.seed(2)
     K = []
     for _ in range(436):
         task = random.sample(range(14), 2)  # 结点不可重复
@@ -523,12 +543,14 @@ if __name__ == "__main__":
     W = range(30)  # 可使用波长
     G = nx.DiGraph((x, y) for (x, y) in arcs)
 
-    opt(W, K, arcs, V)  # 最优解
+    # opt(W, K, arcs, V)  # 最优解
 
     # CG
     C = [[]]  # 策略
-    dit = collections.Counter(C[0])
-    a = [dit]
+    a = []
+    for c in C:
+        dit = collections.Counter(c)
+        a.append(dit)
     ans = CG(arcs, V, SD, SD_idx, W, C, a)
     print(C, a)
     print(ans)

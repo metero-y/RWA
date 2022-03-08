@@ -5,15 +5,17 @@
 """
 from cmath import inf
 import collections
+import copy
 import heapq
 import networkx as nx
 import random
 import numpy as np
+from gurobipy import *
 
 from sqlalchemy import true
 
 
-def solve(G, sp_len, SD, SD_idx, W):
+def solve(G, sp_len, SD, W):
     order = []
     for rq in sp_len:
         if SD[rq] == 0:
@@ -27,7 +29,7 @@ def solve(G, sp_len, SD, SD_idx, W):
             SD[rq] = 0
     heapq.heapify(order)
 
-    C = [[] for _ in W] # 总策略
+    C = [[] for _ in W]  # 总策略
     C_len = [[] for _ in W]  # 总策略对应路径长度
     while order:  # 边赋权还没实现
         require = heapq.heappop(order)
@@ -41,11 +43,13 @@ def solve(G, sp_len, SD, SD_idx, W):
             if now_val < min_val:
                 min_val = now_val
                 wavelength = w
+                lightpath = path
         if min_val < float(inf):
             C[wavelength].append(require[1])
-            C_len[wavelength].append(min_val)
-            for i in range(len(path)-1):  # 更新图
-                G[wavelength].remove_edges_from([(path[i], path[i+1])])
+            C_len[wavelength].append(lightpath)
+            for i in range(len(lightpath)-1):  # 更新图
+                G[wavelength].remove_edges_from(
+                    [(lightpath[i], lightpath[i+1])])
             SD[require[1]] = SD[require[1]]-1
 
             order = []  # 更新order
@@ -66,7 +70,7 @@ def solve(G, sp_len, SD, SD_idx, W):
             heapq.heapify(order)
         else:
             SD[require[1]] = 0
-    return C,C_len
+    return C, C_len
 
 
 if __name__ == "__main__":
@@ -87,7 +91,7 @@ if __name__ == "__main__":
     # g.out_degree(*)记录出*的度
     # g.in_degree(*)记录入*的度
 
-    random.seed(1015)  # 设置随机种子random.seed(2)
+    random.seed(1015)  # 设置随机种子random.seed(1015)
     K = []
     for _ in range(436):
         task = random.sample(range(14), 2)  # 结点不可重复
@@ -95,7 +99,7 @@ if __name__ == "__main__":
     SD = collections.Counter(K)  # 任务
     print('平均值', np.mean(list(SD.values())))
     print('方差', np.var(list(SD.values())))
-    
+
     SD_idx = []
     sp_len = collections.defaultdict(int)  # 每种任务的最短路径长度
     for rq in SD:
@@ -105,10 +109,18 @@ if __name__ == "__main__":
             sp_len[rq] = 0  # 没有最短路径时，设置为0，在求解时会自动忽略
             SD[rq] = 0
         SD_idx.append(rq)
-        
-    C,C_len = solve(G, sp_len, SD, SD_idx, W)
 
-    num=0
+    C, C_len = solve(G, sp_len, SD, W)
+
+    # assignment = [[] for _ in W]
+    # K_copy=copy.deepcopy(K)
+    # for w in range(len(W)):
+    #     for rq in C[w]:
+    #         assignment[w].append(K_copy.index(rq))
+    #         K_copy[assignment[w][-1]]=0
+
+    num = 0
     for i in C:
-        num+=len(i)
+        num += len(i)
     print(num)
+    print(C)
